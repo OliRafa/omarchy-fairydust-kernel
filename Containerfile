@@ -25,9 +25,19 @@ RUN dnf -y install \
  && dnf clean all
 
 # 2) Source: fairydust HEAD. Shallow single-branch clone — we never need history.
+#    KREV pins the exact revision the CI gate resolved, so the image's revision label matches what
+#    actually compiled even if the branch advances mid-run. Empty (e.g. a local ./build.sh) just
+#    takes the branch tip — still "track HEAD".
 ARG KGIT=https://github.com/AsahiLinux/linux.git
+ARG KREV=
 WORKDIR /build
-RUN git clone --branch fairydust --single-branch --depth 1 "$KGIT" linux
+RUN set -eux; \
+    git clone --branch fairydust --single-branch --depth 1 "$KGIT" linux; \
+    if [ -n "$KREV" ] && [ "$(git -C linux rev-parse HEAD)" != "$KREV" ]; then \
+      git -C linux fetch --depth 1 origin "$KREV"; \
+      git -C linux checkout -q "$KREV"; \
+    fi; \
+    echo "building fairydust at $(git -C linux rev-parse HEAD)"
 
 # 3) Config: seed from the base image's own kernel-16k config, then apply the fairydust deltas.
 #    Seeding from the shipped config is what carries 16K pages and every Asahi platform option

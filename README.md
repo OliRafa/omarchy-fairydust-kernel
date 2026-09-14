@@ -19,7 +19,7 @@ Consumed exactly the way omarchy-atomic already consumes the Homebrew image: `FR
 ## Status & caveats
 
 - **Experimental / unsupported.** fairydust is a dev branch; the Asahi team offers no support and it may lag mainline. Expect to rebuild when it moves.
-- **Tracks HEAD — not reproducible.** Every build clones whatever is newest on the branch. CI rebuilds nightly. If you ever need a frozen image, pin a commit in the `git clone` step (swap `--branch fairydust` for a `git checkout <sha>`) and drop the nightly cron.
+- **Tracks HEAD, rebuilds only on change.** CI runs daily but a cheap `check` job first compares the fairydust branch tip against the revision stamped on the published `:latest` image (label `dev.omarchy.fairydust.revision`); the arm64 kernel build runs only when they differ. So the image stays current with the branch without a wasted build every night. A `push` to this repo (config changes) or a forced `workflow_dispatch` always builds. If you ever need a frozen image, pin `KREV` to a specific SHA and drop the cron.
 - **16K pages are mandatory** on Apple Silicon. The build seeds `.config` from the base image's own `kernel-16k` config (which carries 16K pages and every Asahi platform option) and only layers the DP-alt-mode delta on top. The build **fails hard** if `CONFIG_ARM64_16K_PAGES=y` does not survive `olddefconfig`.
 - **No Secure Boot** on the m1n1/u-boot chain, so the kernel is built unsigned — no keys needed.
 - **aarch64 only.** Build on Apple Silicon or an arm64 CI runner; there is no cross-compile path here.

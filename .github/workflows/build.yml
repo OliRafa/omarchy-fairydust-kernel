@@ -1,19 +1,76 @@
 name: build
 
-# Tracks fairydust HEAD, so rebuild on push, nightly, and on demand. The nightly run is what
-# keeps the published image following the branch.
+# Runs daily, but only rebuilds when the fairydust branch has actually moved since the last
+# published image — so it stays current without burning an arm64 kernel build every night.
+# push (config changes here) and a forced dispatch always build.
 on:
   push:
     branches: [main]
   schedule:
     - cron: "0 6 * * *"
   workflow_dispatch:
+    inputs:
+      force:
+        description: "Build even if the fairydust branch has not moved"
+        type: boolean
+        default: false
 
 env:
   FEDORA: "44"
+  IMAGE: ghcr.io/${{ github.repository_owner }}/omarchy-fairydust-kernel
+  REV_LABEL: dev.omarchy.fairydust.revision
 
 jobs:
+  # Cheap gate on a normal x86 runner: resolve fairydust HEAD, read the revision label off the
+  # already-published :latest, and decide whether the arm64 build is worth running.
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      build: ${{ steps.gate.outputs.build }}
+      sha: ${{ steps.gate.outputs.sha }}
+    steps:
+      - name: Install skopeo
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq skopeo
+
+      - name: Decide whether to build
+        id: gate
+        env:
+          GHUSER: ${{ github.actor }}
+          GHTOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT: ${{ github.event_name }}
+          FORCE: ${{ github.event.inputs.force }}
+        run: |
+          set -euo pipefail
+          upstream="$(git ls-remote https://github.com/AsahiLinux/linux.git refs/heads/fairydust | awk '{print $1}')"
+          [ -n "$upstream" ] || { echo "could not resolve fairydust HEAD"; exit 1; }
+          echo "fairydust HEAD: $upstream"
+
+          last=""
+          if skopeo inspect --retry-times 3 --creds "$GHUSER:$GHTOKEN" "docker://$IMAGE:latest" > meta.json 2>/dev/null; then
+            last="$(jq -r --arg k "$REV_LABEL" '.Labels[$k] // ""' meta.json)"
+            echo "last built: ${last:-<none>}"
+          else
+            echo "no published :latest yet (or not readable) — will build"
+          fi
+
+          build=false
+          if [ "$EVENT" = "push" ] || [ "$FORCE" = "true" ]; then
+            build=true          # config changes here / manual force
+          elif [ "$upstream" != "$last" ]; then
+            build=true          # branch moved
+          fi
+          echo "decision: build=$build"
+          {
+            echo "build=$build"
+            echo "sha=$upstream"
+          } >> "$GITHUB_OUTPUT"
+
   build:
+    needs: check
+    if: needs.check.outputs.build == 'true'
     # arm64 hosted runner — the kernel must be built natively on aarch64.
     runs-on: ubuntu-24.04-arm
     permissions:
@@ -40,8 +97,13 @@ jobs:
           platforms: linux/arm64
           build-args: |
             FEDORA=${{ env.FEDORA }}
+            KREV=${{ needs.check.outputs.sha }}
           push: true
-          # Lowercase the repo name for a valid image ref, and tag both :latest and the Fedora rev.
+          # Stamp the exact fairydust revision so the next daily gate can compare against it.
+          labels: |
+            ${{ env.REV_LABEL }}=${{ needs.check.outputs.sha }}
+            org.opencontainers.image.revision=${{ needs.check.outputs.sha }}
+            org.opencontainers.image.source=https://github.com/AsahiLinux/linux
           tags: |
-            ghcr.io/${{ github.repository_owner }}/omarchy-fairydust-kernel:latest
-            ghcr.io/${{ github.repository_owner }}/omarchy-fairydust-kernel:${{ env.FEDORA }}
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ env.FEDORA }}
