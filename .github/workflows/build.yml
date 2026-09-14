@@ -1,0 +1,47 @@
+name: build
+
+# Tracks fairydust HEAD, so rebuild on push, nightly, and on demand. The nightly run is what
+# keeps the published image following the branch.
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+env:
+  FEDORA: "44"
+
+jobs:
+  build:
+    # arm64 hosted runner — the kernel must be built natively on aarch64.
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Containerfile
+          platforms: linux/arm64
+          build-args: |
+            FEDORA=${{ env.FEDORA }}
+          push: true
+          # Lowercase the repo name for a valid image ref, and tag both :latest and the Fedora rev.
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/omarchy-fairydust-kernel:latest
+            ghcr.io/${{ github.repository_owner }}/omarchy-fairydust-kernel:${{ env.FEDORA }}

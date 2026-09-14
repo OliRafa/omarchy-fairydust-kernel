@@ -1,0 +1,6 @@
+# Local kernel checkout / build scratch, if anyone builds outside the container.
+/linux/
+/build/
+/kstage/
+*.tar
+*.tar.zst
