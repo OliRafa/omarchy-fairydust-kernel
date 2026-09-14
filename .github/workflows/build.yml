@@ -102,6 +102,11 @@ jobs:
           build-args: |
             FEDORA=${{ env.FEDORA }}
             KREV=${{ needs.check.outputs.sha }}
+          # Persist layers across runs so a staging tweak reuses the compiled-kernel layer.
+          # The compile layer's cache key includes KREV, so it's reused only while the fairydust
+          # revision is unchanged — exactly when recompiling would be wasted.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           push: true
           # Stamp the exact fairydust revision so the next daily gate can compare against it.
           labels: |
