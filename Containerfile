@@ -64,8 +64,10 @@ RUN make -j"$(nproc)"
 # 5) Stage a kver-addressed module tree at its real path under /kstage.
 #    vmlinuz: prefer arch/arm64/boot/vmlinuz.efi (the EFI-ZBOOT self-decompressing image with an
 #    EFI stub — what Fedora arm64 ships and what systemd-boot needs on this UEFI/m1n1 chain). Fall
-#    back to the raw Image only if ZBOOT is off. DTBs go in dtb/ (singular) because omarchy-atomic
-#    step 5 points update-m1n1 at /usr/lib/modules/<kver>/dtb. depmod runs against /kstage/usr (the
+#    back to the raw Image only if ZBOOT is off. DTBs go in dtb/apple/ (the vendor subdir Fedora's
+#    kernel-16k uses and that update-m1n1 globs — DTBS=/usr/lib/modules/<kver>/dtb, then apple/*.dtb;
+#    a flat dtb/ makes update-m1n1 find nothing and skip the devicetree). depmod runs against
+#    /kstage/usr (the
 #    usr-merged module root) so the shipped tree has correct modules.dep. fairydust.kver hands the
 #    consumer the version string so its swap step never has to guess.
 RUN set -eux; \
@@ -78,8 +80,8 @@ RUN set -eux; \
     install -Dm644 "$img" "$dst/vmlinuz"; \
     install -Dm644 .config "$dst/config"; \
     install -Dm644 System.map "$dst/System.map"; \
-    install -d "$dst/dtb"; \
-    install -m644 arch/arm64/boot/dts/apple/*.dtb "$dst/dtb/"; \
+    install -d "$dst/dtb/apple"; \
+    install -m644 arch/arm64/boot/dts/apple/*.dtb "$dst/dtb/apple/"; \
     depmod -b /kstage/usr "$kver"; \
     printf '%s\n' "$kver" > /kstage/usr/lib/modules/fairydust.kver; \
     echo "staged fairydust kernel $kver"

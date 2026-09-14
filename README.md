@@ -9,7 +9,7 @@ It contains nothing but the kernel module tree on a `FROM scratch` base:
   vmlinuz          # EFI-ZBOOT image (vmlinuz.efi), or raw Image if ZBOOT is off
   config
   System.map
-  dtb/*.dtb        # Apple devicetrees (singular "dtb" — update-m1n1 reads this path)
+  dtb/apple/*.dtb  # Apple devicetrees (vendor subdir — update-m1n1 globs dtb/apple/*.dtb)
   kernel/ ...      # stripped modules + modules.dep
 /usr/lib/modules/fairydust.kver   # the built version string, for the consumer's swap step
 ```
