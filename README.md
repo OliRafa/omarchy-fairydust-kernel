@@ -31,6 +31,20 @@ Consumed exactly the way omarchy-atomic already consumes the Homebrew image: `FR
 ENGINE=podman FEDORA=44 ./build.sh
 ```
 
+### Test build with local patches
+
+`patches/*.patch` holds cherry-picks that are **not** in the fairydust branch (see
+[`patches/README.md`](patches/README.md)) — currently the two commits from AsahiLinux/linux **PR #622**
+that fix external-display **hotplug** on DP alt mode. They are OFF by default: the CI-published
+`:latest`/`:44` track the branch verbatim. Build a private, distinctly-tagged image with them:
+
+```bash
+PATCHES=1 ./build.sh          # -> omarchy-fairydust-kernel:44-dp622
+```
+
+This pins `KREV` to the revision the patches were validated against and fails the build loudly if they
+no longer apply. omarchy-atomic consumes it via its `fairydust-core-dp622` build target.
+
 Config policy — the only hand-maintained kernel knobs — lives in [`configure-fairydust-kernel.sh`](configure-fairydust-kernel.sh). It is the fairydust delta lifted from `bharambetejas/asahi-fairydust-display`, reconciled to a container build (we drop that script's `make install` / `update-m1n1` / `grub2-mkconfig` steps — those belong to the consumer, below).
 
 ## Consuming it from omarchy-atomic

@@ -39,6 +39,30 @@ RUN set -eux; \
     fi; \
     echo "building fairydust at $(git -C linux rev-parse HEAD)"
 
+# 2b) Optional local patches on top of fairydust HEAD (e.g. cherry-picks of fixes not yet in the
+#     branch — see patches/README.md). OFF by default so the published image tracks the branch
+#     verbatim and the CI workflow (which never sets this) keeps shipping a clean :latest/:44. Turn
+#     it on for a private test image with `--build-arg APPLY_PATCHES=1` (the PATCHES=1 ./build.sh
+#     shortcut, which also pins KREV to the patches' validated base). Applied with `git apply`, so a
+#     branch that has drifted past the patches fails the build loudly instead of miscompiling.
+ARG APPLY_PATCHES=0
+WORKDIR /build/linux
+COPY patches/ /tmp/kpatches/
+RUN set -eux; \
+    if [ "$APPLY_PATCHES" = 1 ]; then \
+      applied=0; \
+      for p in /tmp/kpatches/*.patch; do \
+        [ -e "$p" ] || { echo "APPLY_PATCHES=1 but patches/ has no *.patch"; exit 1; }; \
+        echo "applying $(basename "$p")"; \
+        git apply --verbose "$p" \
+          || { echo "FAILED to apply $(basename "$p") — fairydust HEAD drifted past it; pin KREV to the patches' base (patches/README.md)"; exit 1; }; \
+        applied=$((applied + 1)); \
+      done; \
+      echo "applied $applied local patch(es) on top of fairydust HEAD"; \
+    else \
+      echo "APPLY_PATCHES=0 — building fairydust HEAD verbatim, no local patches"; \
+    fi
+
 # 3) Config: seed from the base image's own kernel-16k config, then apply the fairydust deltas.
 #    Seeding from the shipped config is what carries 16K pages and every Asahi platform option
 #    forward untouched — we only add the DP-alt-mode delta on top. Fail hard if 16K pages did not
