@@ -31,23 +31,24 @@ Consumed exactly the way omarchy-atomic already consumes the Homebrew image: `FR
 ENGINE=podman FEDORA=44 ./build.sh
 ```
 
-### USB4 + DP-alt variant (`-usb4`)
+### USB4 variant (`-usb4`)
 
 7.1.13 fairydust has DP-alt but **not** the Apple USB4/Thunderbolt driver (`drivers/thunderbolt/apple.c`
-is absent). That driver, plus newer DP-alt drivers, live in **`asahi-wip-7.2`** (7.2.2) — and the
-fairydust "DP-alt" secret sauce turns out to be just **12 activation commits (devicetree + tipd, no
-driver C code)** on top of `asahi-wip`. So a combined kernel is `asahi-wip-7.2` + those 12 commits,
-with `CONFIG_USB4_APPLE_SOC` enabled:
+is absent). Both that driver and newer DP-alt drivers live in **`asahi-wip-7.2`** (7.2.2), which also
+**supersedes fairydust's DP-alt tipd hack** with a proper `cd321x_typec_update_mode` path (via the
+typec mux). So this variant is just `asahi-wip-7.2` **verbatim** with Apple USB4 enabled — no fairydust
+cherry-picks (they conflict and would fight 7.2's implementation):
 
 ```bash
 USB4=1 ./build.sh             # -> omarchy-fairydust-kernel:44-usb4
 ```
 
-It cherry-picks the 12 fairydust DP-alt commits onto the pinned `asahi-wip-7.2` tip (a conflict fails
-the build before the compile) and enables `CONFIG_USB4` + `CONFIG_USB4_APPLE_SOC`. The clean
-`:latest`/`:44` (fairydust HEAD) is untouched. CI builds it on demand via `build-usb4.yml`; omarchy-atomic
-consumes it via its `fairydust-core-usb4` build target. The pinned SHAs live in `build.sh` /
-`build-usb4.yml` — bump them to track `asahi-wip-7.2` / fairydust as they move.
+It builds the pinned `asahi-wip-7.2` tip and enables `CONFIG_USB4` + `CONFIG_USB4_APPLE_SOC`. Besides
+USB4/Thunderbolt, it also tests whether 7.2's **native** DP-alt path drives an external monitor without
+any fairydust hack. The clean `:latest`/`:44` (fairydust HEAD) is untouched. CI builds it on demand via
+`build-usb4.yml`; omarchy-atomic consumes it via its `fairydust-core-usb4` target. The Containerfile
+still supports `KBRANCH`/`CHERRY` for arbitrary branch + cherry-pick builds; the `-usb4` pin lives in
+`build.sh` / `build-usb4.yml` — bump it to track `asahi-wip-7.2`.
 
 Config policy — the only hand-maintained kernel knobs — lives in [`configure-fairydust-kernel.sh`](configure-fairydust-kernel.sh). It is the fairydust delta lifted from `bharambetejas/asahi-fairydust-display`, reconciled to a container build (we drop that script's `make install` / `update-m1n1` / `grub2-mkconfig` steps — those belong to the consumer, below).
 
