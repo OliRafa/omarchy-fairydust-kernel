@@ -1,13 +1,14 @@
-name: build-usb4 (asahi-wip-7.2 + fairydust DP-alt + Apple Thunderbolt)
+name: build-usb4 (asahi-wip-7.2 + Apple Thunderbolt)
 
 # On-demand build of asahi-wip-7.2 — which already carries USB4/Thunderbolt AND newer DP-alt drivers
-# than 7.1.13 fairydust — with the 12 fairydust DP-alt activation commits cherry-picked on top and
-# Apple USB4 enabled, pushed as:
+# with a proper CD321x DP-alt path that supersedes fairydust's tipd hack — with Apple USB4 enabled,
+# pushed as:
 #
 #   ghcr.io/<owner>/omarchy-fairydust-kernel:44-usb4
 #
-# The clean :latest/:44 (fairydust HEAD) that build.yml publishes is untouched. Native arm64 build
-# (a full kernel compile). Keep the pins below in sync with build.sh.
+# No fairydust DP-alt cherry-picks: 7.2 re-did that plumbing (they conflict). This build tests USB4
+# AND whether 7.2's native DP-alt path drives the monitor on its own. The clean :latest/:44 (fairydust
+# HEAD) that build.yml publishes is untouched. Native arm64 build. Keep the pin in sync with build.sh.
 on:
   workflow_dispatch:
     inputs:
@@ -20,7 +21,6 @@ env:
   FEDORA: "44"
   BASE_BRANCH: "asahi-wip-7.2"
   BASE_KREV: "236788cd2602a24c703fe7bdaddaf73ef77d2027"
-  CHERRY: "296c91ac1fa51a21117524561cd77eaf0c7fe62a 9c16792154f8454ccbc6a28309d57d531ced015a 7eb5629306578387dbee2add2ee4ec00239f723d 7003fe04cb40b6e16ca44726857fac2cba99ec43 bd435201b52785b50b511ae7df87d1f9a8a2714e 6f72fa4b26b42f8a88f1d17f4f0d2d482c1e93a8 eebf132beaf1f0c73b1471fa8f9b1f03aeb5f499 a54f5fe496c3fdee2615e42c8aa4018ed9f7f807 0b0e4af50f8cd1ccbec26265dab4de388a238182 cf8f09832bde2851528598ebbc3c59528348ea23 b4a562f643bba937229e21994069c4ee291c3510 ce9f2eba72c061a50b2d790450e90af3439d8c24"
 
 jobs:
   build:
@@ -49,7 +49,7 @@ jobs:
           rev="${{ github.event.inputs.base_rev }}"
           [ -n "$rev" ] || rev="${BASE_KREV}"
           { echo "image=$image"; echo "rev=$rev"; } >> "$GITHUB_OUTPUT"
-          echo "building $BASE_BRANCH @ $rev + fairydust DP-alt cherries + Apple USB4"
+          echo "building $BASE_BRANCH @ $rev + Apple USB4 (7.2 native DP-alt)"
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -61,7 +61,6 @@ jobs:
             FEDORA=${{ env.FEDORA }}
             KBRANCH=${{ env.BASE_BRANCH }}
             KREV=${{ steps.r.outputs.rev }}
-            CHERRY=${{ env.CHERRY }}
             WITH_USB4=1
           push: true
           labels: |
@@ -76,5 +75,5 @@ jobs:
           {
             echo "### Pushed USB4 + DP-alt test kernel"
             echo "- \`${{ steps.r.outputs.image }}:$FEDORA-usb4\`"
-            echo "- base: \`${BASE_BRANCH}@${{ steps.r.outputs.rev }}\` + 12 fairydust DP-alt cherries + CONFIG_USB4_APPLE_SOC"
+            echo "- base: \`${BASE_BRANCH}@${{ steps.r.outputs.rev }}\` + CONFIG_USB4_APPLE_SOC (7.2 native DP-alt, no fairydust cherries)"
           } >> "$GITHUB_STEP_SUMMARY"
