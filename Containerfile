@@ -76,8 +76,11 @@ RUN set -eux; \
     cp "$base_cfg" .config; \
     bash /tmp/configure-fairydust-kernel.sh; \
     if [ "$WITH_USB4" = 1 ]; then \
-      echo "enabling Apple USB4 / Thunderbolt (USB4 + USB4_APPLE_SOC)"; \
-      scripts/config --module USB4 --module USB4_APPLE_SOC; \
+      echo "enabling Apple USB4 / Thunderbolt (USB4 + USB4_APPLE_SOC + RESET_APPLE_CIO)"; \
+      # RESET_APPLE_CIO drives the CIO reset controller (apple,t8103-cio-reset). USB4_APPLE_SOC does
+      # NOT select it, and on 7.2 the ATC-port typec path routes through the ACIO, which cannot reset
+      # without it — so omitting it wedges the ACIO in deferred probe and takes ALL USB down with it.
+      scripts/config --module USB4 --module USB4_APPLE_SOC --module RESET_APPLE_CIO; \
     fi; \
     make olddefconfig; \
     make rustavailable; \
